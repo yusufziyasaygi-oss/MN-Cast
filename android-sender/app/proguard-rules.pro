@@ -1,0 +1,1 @@
+-keep class com.mavinokta.mncast.sender.** { *; }
