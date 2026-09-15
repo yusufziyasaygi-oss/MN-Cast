@@ -11,32 +11,38 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-java@v4
         with:
           distribution: zulu
           java-version: '21'
           cache: gradle
-      - uses: android-actions/setup-android@v3
-      - name: Install Android toolchain
-        run: |
-          yes | sdkmanager --licenses >/dev/null || true
-          sdkmanager "platforms;android-36" "build-tools;35.0.0" "build-tools;36.0.0" "ndk;27.0.12077973" "cmake;3.22.1"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-36 build-tools;36.0.0 ndk;27.0.12077973 cmake;3.22.1'
+
       - name: Clone pinned TV base
         run: |
-          git clone --recurse-submodules https://github.com/ebreen/shield-airplay.git tv
+          git clone https://github.com/ebreen/shield-airplay.git tv
           cd tv
           git checkout 3aac6f0
           git submodule update --init --recursive
+
       - name: Apply MN Cast overlay
         run: python3 scripts/apply_mncast.py tv tv-overlay
+
       - name: Build TV APK
         working-directory: tv
         run: |
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon --max-workers=2 '-Dorg.gradle.jvmargs=-Xmx3g -Dfile.encoding=UTF-8'
           cp app/build/outputs/apk/debug/app-debug.apk ../MN-Cast-TV.apk
+
       - name: Hash TV APK
         run: sha256sum MN-Cast-TV.apk > MN-Cast-TV.sha256
+
       - uses: actions/upload-artifact@v4
         with:
           name: MN-Cast-TV
@@ -50,27 +56,31 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-java@v4
         with:
           distribution: zulu
           java-version: '21'
-          cache: gradle
-      - uses: android-actions/setup-android@v3
-      - name: Install Android SDK
-        run: |
-          yes | sdkmanager --licenses >/dev/null || true
-          sdkmanager "platforms;android-36" "build-tools;36.0.0"
-      - name: Create Gradle wrapper
-        working-directory: android-sender
-        run: gradle wrapper --gradle-version 8.11.1
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-36 build-tools;36.0.0'
+
+      - name: Set up Gradle 8.11.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+
       - name: Build Sender APK
         working-directory: android-sender
         run: |
-          chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon --max-workers=2 '-Dorg.gradle.jvmargs=-Xmx2g -Dfile.encoding=UTF-8'
+          gradle assembleDebug --no-daemon --max-workers=2 '-Dorg.gradle.jvmargs=-Xmx2g -Dfile.encoding=UTF-8'
           cp app/build/outputs/apk/debug/app-debug.apk ../MN-Cast-Sender.apk
+
       - name: Hash Sender APK
         run: sha256sum MN-Cast-Sender.apk > MN-Cast-Sender.sha256
+
       - uses: actions/upload-artifact@v4
         with:
           name: MN-Cast-Sender
